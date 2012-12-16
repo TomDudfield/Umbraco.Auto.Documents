@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Text;
 using umbraco;
 using umbraco.BusinessLogic;
 using umbraco.NodeFactory;
@@ -58,45 +57,15 @@ namespace AutoFolders
                 if (parent == null)
                     return;
 
-                var year = itemDate.Year.ToString(CultureInfo.InvariantCulture);
-                Node yearNode = parent.Children.Cast<Node>().Where(y => y.Name == year).Select(y => new Node(y.Id)).FirstOrDefault();
-
-                if (yearNode == null)
-                {
-                    yearNode = CreateFolder(document, year, parent);
-                }
-
-                var month = itemDate.ToString("MM");
-                Node monthNode = yearNode.Children.Cast<Node>().Where(m => m.Name == month).Select(m => new Node(m.Id)).FirstOrDefault();
-
-                if (monthNode == null)
-                {
-                    Document monthDocument = Document.MakeNew(month, DocumentType.GetByAlias(DateFolderDocType), document.User, yearNode.Id);
-                    monthDocument.Publish(document.User);
-                    library.UpdateDocumentCache(monthDocument.Id);
-                    monthNode = new Node(monthDocument.Id);
-                }
-
-                Node dayNode = null;
-
-                if (CreateDayFolders)
-                {
-                    var day = itemDate.ToString("dd");
-                    dayNode = monthNode.Children.Cast<Node>().Where(d => d.Name == day).Select(d => new Node(d.Id)).FirstOrDefault();
-
-                    if (dayNode == null)
-                    {
-                        Document dayDocument = Document.MakeNew(day, DocumentType.GetByAlias(DateFolderDocType), document.User, monthNode.Id);
-                        dayDocument.Publish(document.User);
-                        library.UpdateDocumentCache(dayDocument.Id);
-                        dayNode = new Node(dayDocument.Id);
-                    }
-                }
-
+                var yearNode = GetOrCreateNode(document.User, parent, itemDate.Year.ToString(CultureInfo.InvariantCulture));
+                var monthNode = GetOrCreateNode(document.User, yearNode, itemDate.ToString("MM"));
                 var parentNode = monthNode;
 
                 if (CreateDayFolders)
+                {
+                    var dayNode = GetOrCreateNode(document.User, monthNode, itemDate.ToString("dd"));
                     parentNode = dayNode;
+                }
 
                 if (parentNode != null && document.Parent.Id != parentNode.Id)
                 {
@@ -127,16 +96,21 @@ namespace AutoFolders
             return parent;
         }
 
-        private Node CreateFolder(Document document, string year, Node parent)
+        private Node GetOrCreateNode(User user, Node parentNode, string nodeName)
         {
-            Node yearNode;
-            Document yearDocument = Document.MakeNew(year, DocumentType.GetByAlias(DateFolderDocType), document.User, parent.Id);
-            yearDocument.Publish(document.User);
-            library.UpdateDocumentCache(yearDocument.Id);
-            yearNode = new Node(yearDocument.Id);
-            return yearNode;
-        }
+            Node node = parentNode.Children.Cast<Node>().Where(n => n.Name == nodeName).Select(n => new Node(n.Id)).FirstOrDefault();
 
+            if (node == null)
+            {
+                Document document = Document.MakeNew(nodeName, DocumentType.GetByAlias(DateFolderDocType), user, parentNode.Id);
+                document.Publish(user);
+                library.UpdateDocumentCache(document.Id);
+                node = new Node(document.Id);
+            }
+
+            return node;
+        }
+        
         private bool HasDateChanged(Document document)
         {
             DocumentVersionList[] versions = document.GetVersions();
