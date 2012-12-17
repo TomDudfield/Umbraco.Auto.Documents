@@ -7,29 +7,29 @@ using umbraco.BusinessLogic;
 using umbraco.NodeFactory;
 using umbraco.cms.businesslogic.web;
 
-namespace AutoFolders
+namespace AutoDocuments
 {
-    public class AutoFolders
+    public class AutoDocuments
     {
-        public AutoFolders(List<string> itemDocTypes, string itemDateProperty, string dateFolderDocType, bool createDayFolders)
+        public AutoDocuments(List<string> itemDocumentTypes, string itemDateProperty, string dateDocumentType, bool createDayDocuments)
         {
-            ItemDocTypes = itemDocTypes;
+            ItemDocumentTypes = itemDocumentTypes;
             ItemDateProperty = itemDateProperty;
-            DateFolderDocType = dateFolderDocType;
-            CreateDayFolders = createDayFolders;
+            DateDocumentType = dateDocumentType;
+            CreateDayDocuments = createDayDocuments;
         }
 
-        public List<string> ItemDocTypes { get; private set; }
+        public List<string> ItemDocumentTypes { get; private set; }
 
         public string ItemDateProperty { get; private set; }
 
-        public string DateFolderDocType { get; private set; }
+        public string DateDocumentType { get; private set; }
 
-        public bool CreateDayFolders { get; private set; }
+        public bool CreateDayDocuments { get; private set; }
 
         public void SetDocumentDate(Document document)
         {
-            if (!ItemDocTypes.Contains(document.ContentType.Alias))
+            if (!ItemDocumentTypes.Contains(document.ContentType.Alias))
                 return;
             if (document.getProperty(ItemDateProperty) == null)
                 return;
@@ -39,12 +39,12 @@ namespace AutoFolders
 
         public void BeforeDocumentPublish(Document document)
         {
-            if (!ItemDocTypes.Contains(document.ContentType.Alias) || document.Parent == null)
+            if (!ItemDocumentTypes.Contains(document.ContentType.Alias) || document.Parent == null)
                 return;
             if (document.getProperty(ItemDateProperty) == null || document.getProperty(ItemDateProperty).Value == null)
                 return;
 
-            Log.Add(LogTypes.Debug, document.User, document.Id, string.Format("Start Date Folders Before Publish Event for Document {0}", document.Id));
+            Log.Add(LogTypes.Debug, document.User, document.Id, string.Format("Start Auto Documents Before Publish Event for Document {0}", document.Id));
 
             try
             {
@@ -61,7 +61,7 @@ namespace AutoFolders
                 var monthNode = GetOrCreateNode(document.User, yearNode, itemDate.ToString("MM"));
                 var parentNode = monthNode;
 
-                if (CreateDayFolders)
+                if (CreateDayDocuments)
                 {
                     var dayNode = GetOrCreateNode(document.User, monthNode, itemDate.ToString("dd"));
                     parentNode = dayNode;
@@ -75,7 +75,7 @@ namespace AutoFolders
             }
             catch (Exception ex)
             {
-                Log.Add(LogTypes.Error, document.User, document.Id, string.Format("Error in Date Folders Before Publish: {0}", ex.Message));
+                Log.Add(LogTypes.Error, document.User, document.Id, string.Format("Error in Auto Documents Before Publish: {0}", ex.Message));
             }
 
             library.RefreshContent();
@@ -85,7 +85,7 @@ namespace AutoFolders
         {
             var parent = new Node(document.Parent.Id);
 
-            while (parent != null && parent.NodeTypeAlias == DateFolderDocType)
+            while (parent != null && parent.NodeTypeAlias == DateDocumentType)
             {
                 parent = parent.Parent == null ? null : new Node(parent.Parent.Id);
             }
@@ -102,7 +102,7 @@ namespace AutoFolders
 
             if (node == null)
             {
-                Document document = Document.MakeNew(nodeName, DocumentType.GetByAlias(DateFolderDocType), user, parentNode.Id);
+                Document document = Document.MakeNew(nodeName, DocumentType.GetByAlias(DateDocumentType), user, parentNode.Id);
                 document.Publish(user);
                 library.UpdateDocumentCache(document.Id);
                 node = new Node(document.Id);

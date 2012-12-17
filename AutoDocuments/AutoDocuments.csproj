@@ -7,8 +7,8 @@
     <ProjectGuid>{0F212DC0-F5D7-49CA-AE5D-87D2A69149D4}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>AutoFolders</RootNamespace>
-    <AssemblyName>AutoFolders</AssemblyName>
+    <RootNamespace>AutoDocuments</RootNamespace>
+    <AssemblyName>AutoDocuments</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
@@ -172,8 +172,8 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="AutoFolders.cs" />
-    <Compile Include="AutoFoldersApplicationEventHandler.cs" />
+    <Compile Include="AutoDocuments.cs" />
+    <Compile Include="AutoDocumentsApplicationEventHandler.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
