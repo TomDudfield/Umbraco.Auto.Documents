@@ -19,6 +19,10 @@ namespace AutoFolders
 
         public void OnApplicationStarting(UmbracoApplication httpApplication, ApplicationContext applicationContext)
         {
+        }
+
+        public void OnApplicationStarted(UmbracoApplication httpApplication, ApplicationContext applicationContext)
+        {
             var itemDocType = ConfigurationManager.AppSettings["autofolders:ItemDocType"];
             var dateFolderDocType = ConfigurationManager.AppSettings["autofolders:DateFolderDocType"];
             var itemDateProperty = ConfigurationManager.AppSettings["autofolders:ItemDateProperty"];
@@ -44,10 +48,6 @@ namespace AutoFolders
 
             Document.New += DocumentNew;
             Document.BeforePublish += DocumentBeforePublish;
-        }
-
-        public void OnApplicationStarted(UmbracoApplication httpApplication, ApplicationContext applicationContext)
-        {
         }
         
         private void DocumentNew(Document document, NewEventArgs e)

@@ -5,10 +5,10 @@ Creates folders automatically based on a date property on a document type
 eg /2012/11/05/Item
 
 The alias of the document type to create the auto folders for
-`<add key="autofolders:ItemDocType" value="false" />`
+`<add key="autofolders:ItemDocType" value="BlogPost" />`
 
 The alias of the date folder document type
-`<add key="autofolders:DateFolderDocType" value="dateFolder" />`
+`<add key="autofolders:DateFolderDocType" value="DateFolder" />`
 
 The alias of the date property to base the folders on
 `<add key="autofolders:ItemDateProperty" value="itemDate" />`
