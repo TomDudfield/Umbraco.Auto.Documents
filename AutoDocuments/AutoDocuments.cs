@@ -52,7 +52,7 @@ namespace AutoDocuments
                     return;
 
                 DateTime itemDate = Convert.ToDateTime(document.getProperty(ItemDateProperty).Value);
-                Node parent = GetParentDocument(document);
+                Node parent = GetParentDocument(new Node(document.Parent.Id));
 
                 if (parent == null)
                     return;
@@ -81,19 +81,13 @@ namespace AutoDocuments
             library.RefreshContent();
         }
 
-        private Node GetParentDocument(Document document)
+        private Node GetParentDocument(Node node)
         {
-            var parent = new Node(document.Parent.Id);
+            if (node == null || node.Parent == null || node.NodeTypeAlias != DateDocumentType)
+                return node;
 
-            while (parent != null && parent.NodeTypeAlias == DateDocumentType)
-            {
-                parent = parent.Parent == null ? null : new Node(parent.Parent.Id);
-            }
-
-            if (parent == null)
-                Log.Add(LogTypes.Debug, document.User, document.Id, string.Format("Unable to determine parent document for {0}", document.Id));
-
-            return parent;
+            var parent = new Node(node.Parent.Id);
+            return GetParentDocument(parent);
         }
 
         private Node GetOrCreateNode(User user, Node parentNode, string nodeName)
@@ -110,7 +104,7 @@ namespace AutoDocuments
 
             return node;
         }
-        
+
         private bool HasDateChanged(Document document)
         {
             DocumentVersionList[] versions = document.GetVersions();
