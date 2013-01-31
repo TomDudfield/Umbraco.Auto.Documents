@@ -1,11 +1,11 @@
 ﻿using System.Collections.Generic;
 using System.Configuration;
 using System.Linq;
-using umbraco.BusinessLogic;
-using umbraco.cms.businesslogic;
-using umbraco.cms.businesslogic.web;
+using Umbraco.Core.Events;
+using Umbraco.Core.Logging;
+using Umbraco.Core.Models;
+using Umbraco.Core.Services;
 using Umbraco.Core;
-using Umbraco.Web;
 
 namespace AutoDocuments
 {
@@ -13,15 +13,15 @@ namespace AutoDocuments
     {
         private AutoDocuments _autoDocuments;
 
-        public void OnApplicationInitialized(UmbracoApplication httpApplication, ApplicationContext applicationContext)
+        public void OnApplicationInitialized(UmbracoApplicationBase umbracoApplication, ApplicationContext applicationContext)
         {
         }
 
-        public void OnApplicationStarting(UmbracoApplication httpApplication, ApplicationContext applicationContext)
+        public void OnApplicationStarting(UmbracoApplicationBase umbracoApplication, ApplicationContext applicationContext)
         {
         }
 
-        public void OnApplicationStarted(UmbracoApplication httpApplication, ApplicationContext applicationContext)
+        public void OnApplicationStarted(UmbracoApplicationBase umbracoApplication, ApplicationContext applicationContext)
         {
             var itemDocumentTypes = ConfigurationManager.AppSettings["AutoDocuments:ItemDocumentTypes"];
             var dateDocumentType = ConfigurationManager.AppSettings["AutoDocuments:DateDocumentType"];
@@ -40,24 +40,24 @@ namespace AutoDocuments
 
             if (itemDocTypes == null || itemDocTypes.Count == 0 || string.IsNullOrEmpty(dateDocumentType) || string.IsNullOrEmpty(itemDatePropertyAlias))
             {
-                Log.Add(LogTypes.Debug, 0, string.Format("Auto Documents configuration invalid, ItemDocumentTypes:{0} DateDocumentType:{1} ItemDatePropertyAlias:{2}", itemDocumentTypes, dateDocumentType, itemDatePropertyAlias));
+                LogHelper.Debug<AutoDocumentsApplicationEventHandler>(string.Format("Auto Documents configuration invalid, ItemDocumentTypes:{0} DateDocumentType:{1} ItemDatePropertyAlias:{2}", itemDocumentTypes, dateDocumentType, itemDatePropertyAlias));
                 return;
             }
 
             _autoDocuments = new AutoDocuments(itemDocTypes, itemDatePropertyAlias, dateDocumentType, createDayDocuments);
 
-            Document.New += DocumentNew;
-            Document.BeforePublish += DocumentBeforePublish;
+            ContentService.Created += ContentServiceCreated;
+            ContentService.SendingToPublish += ContentServiceSendingToPublish;
         }
         
-        private void DocumentNew(Document document, NewEventArgs e)
+        private void ContentServiceCreated(IContentService sender, NewEventArgs<IContent> e)
         {
-            _autoDocuments.SetDocumentDate(document);
+            _autoDocuments.SetDocumentDate(sender, e.Entity);
         }
 
-        private void DocumentBeforePublish(Document document, PublishEventArgs e)
+        private void ContentServiceSendingToPublish(IContentService sender, SendToPublishEventArgs<IContent> e)
         {
-            _autoDocuments.BeforeDocumentPublish(document);
+            _autoDocuments.BeforeDocumentPublish(sender, e.Entity);
         }
     }
 }

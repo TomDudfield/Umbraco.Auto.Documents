@@ -2,10 +2,12 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using Umbraco.Core;
+using Umbraco.Core.Logging;
+using Umbraco.Core.Models;
+using Umbraco.Core.Services;
 using umbraco;
-using umbraco.BusinessLogic;
 using umbraco.NodeFactory;
-using umbraco.cms.businesslogic.web;
 
 namespace AutoDocuments
 {
@@ -27,55 +29,56 @@ namespace AutoDocuments
 
         public bool CreateDayDocuments { get; private set; }
 
-        public void SetDocumentDate(Document document)
+        public void SetDocumentDate(IContentService contentService, IContent content)
         {
-            if (!ItemDocumentTypes.Contains(document.ContentType.Alias))
+            if (!ItemDocumentTypes.Contains(content.ContentType.Alias))
                 return;
-            if (document.getProperty(ItemDateProperty) == null)
+            if (content.Properties[ItemDateProperty] == null)
                 return;
 
-            document.getProperty(ItemDateProperty).Value = document.CreateDateTime.Date;
+            content.Properties[ItemDateProperty].Value = content.CreateDate.Date;
+            contentService.Save(content);
         }
 
-        public void BeforeDocumentPublish(Document document)
+        public void BeforeDocumentPublish(IContentService contentService, IContent content)
         {
-            if (!ItemDocumentTypes.Contains(document.ContentType.Alias) || document.Parent == null)
+            if (!ItemDocumentTypes.Contains(content.ContentType.Alias))
                 return;
-            if (document.getProperty(ItemDateProperty) == null || document.getProperty(ItemDateProperty).Value == null)
+            if (content.Properties[ItemDateProperty] == null || content.Properties[ItemDateProperty].Value == null)
                 return;
-
-            Log.Add(LogTypes.Debug, document.User, document.Id, string.Format("Start Auto Documents Before Publish Event for Document {0}", document.Id));
+                
+            LogHelper.Debug<AutoDocuments>(string.Format("Start Auto Documents Before Publish Event for Document {0}", content.Id));
 
             try
             {
-                if (!HasDateChanged(document))
+                if (!HasDateChanged(contentService, content))
                     return;
 
-                DateTime itemDate = Convert.ToDateTime(document.getProperty(ItemDateProperty).Value);
-                Node parent = GetParentDocument(new Node(document.Parent.Id));
+                DateTime itemDate = Convert.ToDateTime(content.Properties[ItemDateProperty].Value);
+                Node parent = GetParentDocument(new Node(content.ParentId));
 
                 if (parent == null)
                     return;
 
-                var yearNode = GetOrCreateNode(document.User, parent, itemDate.Year.ToString(CultureInfo.InvariantCulture));
-                var monthNode = GetOrCreateNode(document.User, yearNode, itemDate.ToString("MM"));
+                var yearNode = GetOrCreateNode(contentService, parent, itemDate.Year.ToString(CultureInfo.InvariantCulture));
+                var monthNode = GetOrCreateNode(contentService, yearNode, itemDate.ToString("MM"));
                 var parentNode = monthNode;
 
                 if (CreateDayDocuments)
                 {
-                    var dayNode = GetOrCreateNode(document.User, monthNode, itemDate.ToString("dd"));
+                    var dayNode = GetOrCreateNode(contentService, monthNode, itemDate.ToString("dd"));
                     parentNode = dayNode;
                 }
 
-                if (parentNode != null && document.Parent.Id != parentNode.Id)
+                if (parentNode != null && content.ParentId != parentNode.Id)
                 {
-                    document.Move(parentNode.Id);
-                    Log.Add(LogTypes.Debug, document.User, document.Id, string.Format("Item {0} moved uder node {1}", document.Id, parentNode.Id));
+                    contentService.Move(content, parentNode.Id);
+                    LogHelper.Debug<AutoDocuments>(string.Format("Item {0} moved uder node {1}", content.Id, parentNode.Id));
                 }
             }
             catch (Exception ex)
             {
-                Log.Add(LogTypes.Error, document.User, document.Id, string.Format("Error in Auto Documents Before Publish: {0}", ex.Message));
+                LogHelper.Error<AutoDocuments>(string.Format("Error in Auto Documents Before Publish: {0}", ex.Message), ex);
             }
 
             library.RefreshContent();
@@ -90,31 +93,33 @@ namespace AutoDocuments
             return GetParentDocument(parent);
         }
 
-        private Node GetOrCreateNode(User user, Node parentNode, string nodeName)
+        private Node GetOrCreateNode(IContentService contentService, Node parentNode, string nodeName)
         {
             Node node = parentNode.Children.Cast<Node>().Where(n => n.Name == nodeName).Select(n => new Node(n.Id)).FirstOrDefault();
 
             if (node == null)
             {
-                Document document = Document.MakeNew(nodeName, DocumentType.GetByAlias(DateDocumentType), user, parentNode.Id);
-                document.Publish(user);
-                library.UpdateDocumentCache(document.Id);
-                node = new Node(document.Id);
+                var contentType = ApplicationContext.Current.Services.ContentTypeService.GetContentType(DateDocumentType);
+                var content = new Content(nodeName, parentNode.Id, contentType);
+                contentService.Publish(content);
+                library.UpdateDocumentCache(content.Id);
+                node = new Node(content.Id);
             }
 
             return node;
         }
 
-        private bool HasDateChanged(Document document)
+        private bool HasDateChanged(IContentService contentService, IContent content)
         {
-            DocumentVersionList[] versions = document.GetVersions();
+            var versions = contentService.GetVersions(content.Id).ToList();
             bool dateHasChanged = true;
-            DateTime itemDate = Convert.ToDateTime(document.getProperty(ItemDateProperty).Value);
+            DateTime itemDate = Convert.ToDateTime(content.Properties[ItemDateProperty].Value);
 
-            if (versions.Length > 1)
+            if (versions.Any())
             {
-                Guid version = versions[versions.Length - 2].Version;
-                DateTime oldItemDate = Convert.ToDateTime(new Document(document.Id, version).getProperty(ItemDateProperty).Value);
+                Guid version = versions[versions.Count() - 2].Version;
+                var previousVersion = contentService.GetByVersion(version);
+                DateTime oldItemDate = Convert.ToDateTime(previousVersion.Properties[ItemDateProperty].Value);
                 dateHasChanged = itemDate != oldItemDate;
             }
 
