@@ -2,12 +2,9 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using Umbraco.Core;
 using Umbraco.Core.Logging;
 using Umbraco.Core.Models;
 using Umbraco.Core.Services;
-using umbraco;
-using umbraco.NodeFactory;
 
 namespace AutoDocuments
 {
@@ -36,7 +33,7 @@ namespace AutoDocuments
             if (content.Properties[ItemDateProperty] == null)
                 return;
 
-            content.Properties[ItemDateProperty].Value = content.CreateDate.Date;
+            content.Properties[ItemDateProperty].Value = DateTime.Today.Date;
             contentService.Save(content);
         }
 
@@ -55,58 +52,54 @@ namespace AutoDocuments
                     return;
 
                 DateTime itemDate = Convert.ToDateTime(content.Properties[ItemDateProperty].Value);
-                Node parent = GetParentDocument(new Node(content.ParentId));
+                IContent parent = GetParentDocument(content, contentService);
 
                 if (parent == null)
                     return;
 
-                var yearNode = GetOrCreateNode(contentService, parent, itemDate.Year.ToString(CultureInfo.InvariantCulture));
-                var monthNode = GetOrCreateNode(contentService, yearNode, itemDate.ToString("MM"));
-                var parentNode = monthNode;
+                var yearContent = GetOrCreateContent(contentService, parent, itemDate.Year.ToString(CultureInfo.InvariantCulture));
+                var monthContent = GetOrCreateContent(contentService, yearContent, itemDate.ToString("MM"));
+                var parentContent = monthContent;
 
                 if (CreateDayDocuments)
                 {
-                    var dayNode = GetOrCreateNode(contentService, monthNode, itemDate.ToString("dd"));
-                    parentNode = dayNode;
+                    var dayContent = GetOrCreateContent(contentService, monthContent, itemDate.ToString("dd"));
+                    parentContent = dayContent;
                 }
 
-                if (parentNode != null && content.ParentId != parentNode.Id)
+                if (parentContent != null && content.ParentId != parentContent.Id)
                 {
-                    contentService.Move(content, parentNode.Id);
-                    LogHelper.Debug<AutoDocuments>(string.Format("Item {0} moved uder node {1}", content.Id, parentNode.Id));
+                    contentService.Move(content, parentContent.Id);
+                    LogHelper.Debug<AutoDocuments>(string.Format("Item {0} moved uder content {1}", content.Id, parentContent.Id));
                 }
             }
             catch (Exception ex)
             {
                 LogHelper.Error<AutoDocuments>(string.Format("Error in Auto Documents Before Publish: {0}", ex.Message), ex);
             }
-
-            library.RefreshContent();
         }
 
-        private Node GetParentDocument(Node node)
+        private IContent GetParentDocument(IContent content, IContentService contentService)
         {
-            if (node == null || node.Parent == null || node.NodeTypeAlias != DateDocumentType)
-                return node;
+            if (content == null || (content.ContentType.Alias != DateDocumentType && !ItemDocumentTypes.Contains(content.ContentType.Alias)))
+                return content;
 
-            var parent = new Node(node.Parent.Id);
-            return GetParentDocument(parent);
+            var parent = contentService.GetById(content.ParentId);
+            return GetParentDocument(parent, contentService);
         }
 
-        private Node GetOrCreateNode(IContentService contentService, Node parentNode, string nodeName)
+        private IContent GetOrCreateContent(IContentService contentService, IContent parentContent, string name)
         {
-            Node node = parentNode.Children.Cast<Node>().Where(n => n.Name == nodeName).Select(n => new Node(n.Id)).FirstOrDefault();
+            IContent content = contentService.GetChildren(parentContent.Id).FirstOrDefault(c => c.Name == name);
 
-            if (node == null)
+            if (content == null)
             {
-                var contentType = ApplicationContext.Current.Services.ContentTypeService.GetContentType(DateDocumentType);
-                var content = new Content(nodeName, parentNode.Id, contentType);
+                content = contentService.CreateContent(name, parentContent.Id, DateDocumentType);
+                contentService.Save(content);
                 contentService.Publish(content);
-                library.UpdateDocumentCache(content.Id);
-                node = new Node(content.Id);
             }
 
-            return node;
+            return content;
         }
 
         private bool HasDateChanged(IContentService contentService, IContent content)
