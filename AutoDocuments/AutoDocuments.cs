@@ -104,14 +104,13 @@ namespace AutoDocuments
 
         private bool HasDateChanged(IContentService contentService, IContent content)
         {
-            var versions = contentService.GetVersions(content.Id).ToList();
+            var versions = contentService.GetVersions(content.Id).OrderBy(v => v.UpdateDate).ToList();
             bool dateHasChanged = true;
             DateTime itemDate = Convert.ToDateTime(content.Properties[ItemDateProperty].Value);
 
-            if (versions.Any())
+            if (versions.Count > 1)
             {
-                Guid version = versions[versions.Count() - 2].Version;
-                var previousVersion = contentService.GetByVersion(version);
+                var previousVersion = versions[versions.Count - 2];
                 DateTime oldItemDate = Convert.ToDateTime(previousVersion.Properties[ItemDateProperty].Value);
                 dateHasChanged = itemDate != oldItemDate;
             }
