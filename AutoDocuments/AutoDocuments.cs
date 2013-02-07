@@ -33,18 +33,20 @@ namespace AutoDocuments
             if (content.Properties[ItemDateProperty] == null)
                 return;
 
+            LogHelper.Debug<AutoDocuments>(string.Format("Start Auto Documents SetDocumentDate Event for Document {0}", content.Id));
+
             content.Properties[ItemDateProperty].Value = DateTime.Today.Date;
             contentService.Save(content);
         }
 
-        public void BeforeDocumentPublish(IContentService contentService, IContent content)
+        public void CreateDateDocuments(IContentService contentService, IContent content)
         {
             if (!ItemDocumentTypes.Contains(content.ContentType.Alias))
                 return;
             if (content.Properties[ItemDateProperty] == null || content.Properties[ItemDateProperty].Value == null)
                 return;
-                
-            LogHelper.Debug<AutoDocuments>(string.Format("Start Auto Documents Before Publish Event for Document {0}", content.Id));
+
+            LogHelper.Debug<AutoDocuments>(string.Format("Start Auto Documents CreateDateDocuments Event for Document {0}", content.Id));
 
             try
             {
@@ -70,13 +72,47 @@ namespace AutoDocuments
                 if (parentContent != null && content.ParentId != parentContent.Id)
                 {
                     contentService.Move(content, parentContent.Id);
-                    LogHelper.Debug<AutoDocuments>(string.Format("Item {0} moved uder content {1}", content.Id, parentContent.Id));
+                    LogHelper.Debug<AutoDocuments>(string.Format("Item {0} moved under content {1}", content.Id, parentContent.Id));
                 }
             }
             catch (Exception ex)
             {
-                LogHelper.Error<AutoDocuments>(string.Format("Error in Auto Documents Before Publish: {0}", ex.Message), ex);
+                LogHelper.Error<AutoDocuments>(string.Format("Error in Auto Documents CreateDateDocuments: {0}", ex.Message), ex);
             }
+        }
+
+        public void DeleteUnusedDateDocuments(IContentService contentService, IContent content)
+        {
+            if (!ItemDocumentTypes.Contains(content.ContentType.Alias))
+                return;
+
+            IContent parent = GetParentDocument(content, contentService);
+
+            if (parent == null)
+                return;
+
+            DeleteEmptyChildren(contentService, parent);
+        }
+
+        private bool DeleteEmptyChildren(IContentService contentService, IContent parent)
+        {
+            var children = contentService.GetChildren(parent.Id).ToList();
+            bool canParentBeDeleted = true;
+
+            foreach (var child in children)
+            {
+                var isParentEmpty = DeleteEmptyChildren(contentService, child);
+                if (!isParentEmpty && canParentBeDeleted)
+                    canParentBeDeleted = false;
+            }
+
+            if (canParentBeDeleted && children.All(c => c.ContentType.Alias == DateDocumentType))
+            {
+                contentService.Delete(parent);
+                return true;
+            }
+
+            return false;
         }
 
         private IContent GetParentDocument(IContent content, IContentService contentService)
@@ -96,7 +132,8 @@ namespace AutoDocuments
             {
                 content = contentService.CreateContent(name, parentContent.Id, DateDocumentType);
                 contentService.Save(content);
-                contentService.Publish(content);
+                if (!contentService.Publish(content))
+                    LogHelper.Warn<AutoDocuments>("Error in Auto Documents GetOrCreateContent");
             }
 
             return content;

@@ -6,8 +6,6 @@ using Umbraco.Core.Logging;
 using Umbraco.Core.Models;
 using Umbraco.Core.Services;
 using Umbraco.Core;
-using umbraco.cms.businesslogic;
-using umbraco.cms.businesslogic.web;
 
 namespace AutoDocuments
 {
@@ -49,7 +47,7 @@ namespace AutoDocuments
             _autoDocuments = new AutoDocuments(itemDocTypes, itemDatePropertyAlias, dateDocumentType, createDayDocuments);
             
             ContentService.Created += ContentServiceCreated;
-            Document.BeforePublish += ContentServiceSendingToPublish;
+            ContentService.Saving += ContentServiceSaving;
         }
         
         private void ContentServiceCreated(IContentService sender, NewEventArgs<IContent> e)
@@ -57,10 +55,10 @@ namespace AutoDocuments
             _autoDocuments.SetDocumentDate(sender, e.Entity);
         }
 
-        private void ContentServiceSendingToPublish(Document document, PublishEventArgs publishEventArgs)
+        private void ContentServiceSaving(IContentService sender, SaveEventArgs<IContent> e)
         {
-            ContentService s =new ContentService();
-            _autoDocuments.BeforeDocumentPublish(s, s.GetById(document.Id));
+            _autoDocuments.CreateDateDocuments(sender, e.SavedEntities.FirstOrDefault());
+          //  _autoDocuments.DeleteUnusedDateDocuments(sender, e.SavedEntities.FirstOrDefault());
         }
     }
 }
